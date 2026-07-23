@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rahul's Daily Goals</title>
+
+    <style>
+      body {
+        background-color: #f0f4ff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 60px;
+      }
+
+      .card {
+        background-color: white;
+        max-width: 500px;
+        margin: auto;
+        padding: 30px;
+        border-radius: 12px;
+      }
+
+      h1 {
+        color: #2563eb;
+      }
+
+      #serverMessage {
+        color: #059669;
+        font-weight: bold;
+      }
+
+      input {
+        padding: 12px;
+        font-size: 16px;
+        width: 55%;
+      }
+
+      button {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      .delete-button {
+        background-color: #dc2626;
+        float: right;
+        padding: 6px 10px;
+        font-size: 14px;
+      }
+
+      li {
+        text-align: left;
+        margin: 12px;
+        font-size: 18px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="card">
+      <h1>My Daily Goals</h1>
+      <p id="serverMessage">Connecting to the server...</p>
+      <p>What do you want to achieve today?</p>
+
+      <input id="goalInput" placeholder="Type a goal here">
+      <button onclick="addGoal()">Add goal</button>
+
+      <ul id="goalList"></ul>
+    </div>
+
+   <script>
+  async function getServerMessage() {
+    let response = await fetch("/api/welcome");
+    let data = await response.json();
+
+    document.getElementById("serverMessage").textContent = data.message;
+  }
+
+  async function showGoals() {
+    let response = await fetch("/api/goals");
+    let goals = await response.json();
+
+    let goalList = document.getElementById("goalList");
+    goalList.innerHTML = "";
+
+    goals.forEach(function (goal) {
+      let newGoal = document.createElement("li");
+      newGoal.textContent = goal.text;
+
+      let deleteButton = document.createElement("button");
+      deleteButton.textContent = "Delete";
+      deleteButton.className = "delete-button";
+
+      deleteButton.onclick = async function () {
+        await fetch("/api/goals/" + goal.id, {
+          method: "DELETE"
+        });
+
+        showGoals();
+      };
+
+      newGoal.appendChild(deleteButton);
+      goalList.appendChild(newGoal);
+    });
+  }
+
+  async function addGoal() {
+    let goalInput = document.getElementById("goalInput");
+    let goal = goalInput.value.trim();
+
+    if (goal !== "") {
+      await fetch("/api/goals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ goal: goal })
+      });
+
+      goalInput.value = "";
+      showGoals();
+    }
+  }
+
+  getServerMessage();
+  showGoals();
+</script>
+  </body>
+</html>
