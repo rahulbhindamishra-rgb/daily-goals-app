@@ -1,33 +1,44 @@
+require("dotenv").config();
+
 const express = require("express");
-const { DatabaseSync } = require("node:sqlite");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const db = new DatabaseSync("goals.db");
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
+  throw new Error("Supabase environment variables are missing.");
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS goals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    text TEXT NOT NULL
-  )
-`);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
 
 app.use(express.json());
 app.use(express.static("public"));
 
 app.get("/api/welcome", function (request, response) {
   response.json({
-    message: "Hello Rahul! Your backend server is working."
+    message: "Hello Rahul! Your cloud database is connected."
   });
 });
 
-app.get("/api/goals", function (request, response) {
-  const goals = db.prepare("SELECT id, text FROM goals").all();
-  response.json(goals);
+app.get("/api/goals", async function (request, response) {
+  const { data, error } = await supabase
+    .from("goals")
+    .select("id, text")
+    .order("id", { ascending: false });
+
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
+  response.json(data);
 });
 
-app.post("/api/goals", function (request, response) {
+app.post("/api/goals", async function (request, response) {
   const goal = request.body.goal?.trim();
 
   if (!goal) {
@@ -35,23 +46,36 @@ app.post("/api/goals", function (request, response) {
     return;
   }
 
-  const result = db
-    .prepare("INSERT INTO goals (text) VALUES (?)")
-    .run(goal);
+  const { data, error } = await supabase
+    .from("goals")
+    .insert({ text: goal })
+    .select("id, text")
+    .single();
 
-  response.status(201).json({
-    id: Number(result.lastInsertRowid),
-    text: goal
-  });
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
+  response.status(201).json(data);
 });
 
-app.delete("/api/goals/:id", function (request, response) {
+app.delete("/api/goals/:id", async function (request, response) {
   const id = Number(request.params.id);
 
-  db.prepare("DELETE FROM goals WHERE id = ?").run(id);
+  const { error } = await supabase
+    .from("goals")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
   response.status(204).end();
 });
 
 app.listen(PORT, function () {
-  console.log("Server running at http://localhost:3000");
+  console.log("Server running at http://localhost:" + PORT);
 });
